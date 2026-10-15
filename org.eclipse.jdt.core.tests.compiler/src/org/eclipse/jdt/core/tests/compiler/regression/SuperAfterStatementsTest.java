@@ -3673,5 +3673,112 @@ public class SuperAfterStatementsTest extends AbstractRegressionTest9 {
 			----------
 			""");
 	}
+	/* JLS 15.9.2: a qualified class instance creation takes its immediately enclosing instance from the qualifier,
+	 * so creating an inner member class of the class under construction through another instance is allowed.
+	 */
+	public void testQualifiedAllocationOfOwnInnerClassInPrologue() {
+		runConformTest(new String[] {
+			"X.java",
+				"""
+					public class X {
+					    final String name;
+					    class Inner {
+					        String outerName() { return X.this.name; }
+					    }
+					    X(X other) {
+					        Inner inner = other.new Inner();
+					        this(inner.outerName() + "-copy");
+					    }
+					    X(String name) {
+					        this.name = name;
+					    }
+					    public static void main(String[] args) {
+					        System.out.println(new X(new X("first")).name);
+					    }
+					}
+				"""
+			},
+			"first-copy");
+	}
+	public void testQualifiedAllocationOfOwnInnerClassInLambdaOfConstructorCall() {
+		runConformTest(new String[] {
+			"X.java",
+				"""
+					import java.util.function.Function;
+					public class X<G> {
+					    final Object owner;
+					    class Owner {
+					        final String key;
+					        Owner(String key) { this.key = key; }
+					        X<G> outer() { return X.this; }
+					    }
+					    X(String key) {
+					        this(host -> host.new Owner(key));
+					    }
+					    private X(Function<X<G>, Object> factory) {
+					        this.owner = factory.apply(this);
+					    }
+					    public static void main(String[] args) {
+					        X<String> host = new X<>("k");
+					        X<String>.Owner owner = (X<String>.Owner) host.owner;
+					        System.out.println(owner.key + " " + (owner.outer() == host));
+					    }
+					}
+				"""
+			},
+			"k true");
+	}
+	public void testQualifiedAnonymousAllocationOfOwnInnerClassInPrologue() {
+		runConformTest(new String[] {
+			"X.java",
+				"""
+					public class X {
+					    class Inner {
+					        String id() { return "inner"; }
+					    }
+					    X(X other) {
+					        Inner inner = other.new Inner() {
+					            @Override String id() { return "anonymous"; }
+					        };
+					        System.out.println(inner.id());
+					        this();
+					    }
+					    X() { }
+					    public static void main(String[] args) {
+					        new X(new X());
+					    }
+					}
+				"""
+			},
+			"anonymous");
+	}
+	/* Qualifying with 'this' still uses the object under construction. */
+	public void testThisQualifiedAllocationOfOwnInnerClassInPrologue() {
+		runNegativeTest(new String[] {
+			"X.java",
+				"""
+					class X {
+					    class Inner {}
+					    X(int i) {
+					        Object o = this.new Inner();
+					        this();
+					    }
+					    X() { }
+					}
+				"""
+			},
+			"----------
+" +
+			"1. ERROR in X.java (at line 4)
+" +
+			"	Object o = this.new Inner();
+" +
+			"	           ^^^^
+" +
+			"Cannot use 'this' in an early construction context
+" +
+			"----------
+");
+	}
 }
 

@@ -300,6 +300,19 @@ public class QualifiedAllocationExpression extends AllocationExpression {
 		return result;
 	}
 
+	/**
+	 * JLS 15.9.2: only an unqualified class instance creation takes its immediately enclosing instance from the enclosing
+	 * class, which is inaccessible in an early construction context of that class. A qualified creation takes it from the
+	 * value of the qualifier instead; a qualifier that is {@code this} is still reported by the check of the {@code this}
+	 * expression itself.
+	 */
+	@Override
+	protected void checkEarlyConstructionContext(BlockScope scope) {
+		if (this.enclosingInstance != null)
+			return;
+		super.checkEarlyConstructionContext(scope);
+	}
+
 	private TypeBinding resolveTypeForQualifiedAllocationExpression(BlockScope scope) {
 		// Propagate the type checking to the arguments, and checks if the constructor is defined.
 		// ClassInstanceCreationExpression ::= Primary '.' 'new' SimpleName '(' ArgumentListopt ')' ClassBodyopt
